@@ -38,6 +38,7 @@ Streamable HTTP mode
 
 from __future__ import annotations
 
+import os
 import argparse
 import asyncio
 import contextlib
@@ -397,14 +398,34 @@ async def main() -> None:
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
+    def _normalize_mode(raw_mode: str) -> str:
+        return (raw_mode or "").strip().lower().replace("_", "-")
+    
+    env_mode = _normalize_mode(os.getenv("TRANSPORT_TYPE", "streamable-http"))
+    env_host = os.getenv("APP_HOST", "0.0.0.0")
+    env_port = os.getenv("APP_PORT")
+
     parser.add_argument(
         "--mode",
         choices=["stdio", "sse", "streamable-http"],
-        default="stdio",
-        help="Transport mode (default: stdio)",
+        default=env_mode,
+        help="Transport mode (default: TRANSPORT_TYPE env or streamable-http)",
     )
-    parser.add_argument("--host", default="0.0.0.0", help="Bind host (HTTP modes only)")
-    parser.add_argument("--port", type=int, default=7070, help="Bind port (HTTP modes only, default: 7070)")
+
+    parser.add_argument(
+        "--host",
+        default=env_host,
+        help="Bind host (default: APP_HOST env or 0.0.0.0)",
+    )
+
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=env_port,
+        help="Bind port (default: APP_PORT env)",
+    )
+
     args = parser.parse_args()
 
     logger.info("="*80)
