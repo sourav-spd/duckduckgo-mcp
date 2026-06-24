@@ -25,22 +25,29 @@ class GetInternetResultToolHandler(ToolHandler):
         return Tool(
             name=self.name,
             description=(
-                "Simple internet search via DuckDuckGo. "
-                "Returns a concise 3-4 line answer with source links."
+                "Simple internet search via DuckDuckGo. Returns a concise 3-4 line answer with source links."
             ),
             inputSchema={
-                "type": "object",
+                "type": "object",  
                 "properties": {
                     "input_value": {
                         "type": "string",
-                        "description": (
-                            "The search query or natural language question. "
-                            "Examples: 'What is machine learning?', 'best travel destinations in Europe', "
-                            "'how to invest in mutual funds'"
-                        ),
+                        "description": "Search query"
                     }
                 },
-                "required": ["input_value"],
+                "required": ["input_value"]
+
+                # "properties": {
+                #     "input_value": {
+                #         "type": "string",
+                #         "description": (
+                #             "The search query or natural language question. "
+                #             "Examples: 'What is machine learning?', 'best travel destinations in Europe', "
+                #             "'how to invest in mutual funds'"
+                #         ),
+                #     }
+                # },
+                # "required": ["input_value"],
             },
         )
 

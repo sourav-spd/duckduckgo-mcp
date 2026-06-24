@@ -22,4 +22,4 @@ dependencies = [
 where = ["src"]
 
 [project.scripts]
-duckduckgo-browser-mcp = "duckduckgo_browser:main"
+duckduckgo-browser-mcp = "duckduckgo_browser.duckduckgo_server:main"

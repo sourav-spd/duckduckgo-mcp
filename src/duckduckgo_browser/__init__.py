@@ -1,5 +1,5 @@
 import asyncio
-from .server import main as async_main
+from .duckduckgo_server import main as async_main
 
 
 def main() -> None:
