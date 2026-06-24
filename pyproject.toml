@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "duckduckgo-browser-mcp"
+version = "1.0.0"
+description = "Production-ready MCP server for deterministic internet search simulation via DuckDuckGo Browser."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "RAISE Team" }]
+dependencies = [
+  "mcp[cli]>=1.12.0",
+  "starlette>=0.27.0",
+  "uvicorn>=0.20.0",
+  "requests>=2.31.0",
+  "beautifulsoup4>=4.12.0",
+  "truststore>=0.10.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+duckduckgo-browser-mcp = "duckduckgo_browser:main"
