@@ -458,3 +458,6 @@ async def main() -> None:
         sys.exit(1)
     finally:
         logger.info("Server shutdown complete")
+
+if __name__ == "__main__":
+    asyncio.run(main())
