@@ -57,7 +57,7 @@ from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
 from starlette.routing import Route
 
-from .tools import GetInternetResultToolHandler, ToolHandler
+from duckduckgo_browser.tools import GetInternetResultToolHandler, ToolHandler
 
 logging.basicConfig(
     level=logging.INFO,

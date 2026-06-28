@@ -1,4 +1,4 @@
-from .search_engine import (
+from duckduckgo_browser.services.search_engine import (
     DeterministicSearchEngine,  # Backwards compatibility
     RealSearchEngine,
     SearchResponse,
