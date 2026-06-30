@@ -1,95 +1,128 @@
-# DuckDuckGo Browser MCP Server
+# DuckDuckGo MCP Server
 
-A production-ready **Model Context Protocol (MCP)** server that performs **real-time internet searches** via the DuckDuckGo Lite endpoint (`https://lite.duckduckgo.com/lite/`) with automatic retry logic, intelligent caching, and robust error handling across all transport modes.
+A production-ready **Model Context Protocol (MCP)** server that performs real-time internet searches via the DuckDuckGo Lite endpoint (`https://lite.duckduckgo.com/lite/`) with automatic retry logic, intelligent caching, and robust error handling.
 
-**Previously:** Simulated search with a deterministic knowledge base  
-**Now:** Live web search results with enterprise-grade reliability
-
----
-
-## What's New
-
-✨ **Real-Time Search**: Fetch live results from DuckDuckGo Lite  
-🔄 **Automatic Retries**: 3 attempts with exponential backoff  
-💾 **Smart Caching**: 5-minute TTL with stale-data fallback  
-⏱️ **Timeout Protection**: Request-level and session-level timeouts  
-📊 **Auto-Detection**: Category detection from search results  
-🛡️ **Robust Modes**: Enhanced error handling for STDIO, SSE, and Streamable HTTP  
-📝 **Detailed Logging**: Debug-friendly operation tracking  
+Supports all three MCP transports:
+- **stdio** — for MCP desktop hosts and IDE plugins
+- **SSE** — Server-Sent Events over HTTP
+- **streamable-http** — chunked HTTP streaming (default for container deployment)
 
 ---
 
 ## Folder Structure
 
-```
-duckduckgo-browser-mcp/
-├── src/
-│   └── duckduckgo_browser/
-│       ├── __init__.py              # Package entry point (sync main())
-│       ├── __main__.py              # python -m duckduckgo_browser
-│       ├── server.py                # MCP app + all three transport modes
-│       ├── services/
-│       │   ├── __init__.py
-│       │   ├── search_engine.py     # Real-time search via DuckDuckGo Lite
-│       │   └── web_scraper.py       # Web scraper with retry logic & caching
-│       └── tools/
-│           ├── __init__.py
-│           ├── toolhandler.py       # Abstract base class for tools
-│           └── search_tools.py      # get_internet_result tool handler
+```text
+duckduckgo-tool/
+├── duckduckgo_server.py             # Main MCP server entry point
+├── pyproject.toml
+├── Dockerfile
+├── README.md
+├── pytest.ini
 ├── tests/
 │   ├── __init__.py
 │   └── test_search_tools.py
-├── Dockerfile
-├── pyproject.toml
-├── pytest.ini
-└── README.md
+└── src/
+    └── duckduckgo_browser/
+        ├── __init__.py
+        ├── __main__.py              # python -m duckduckgo_browser
+        ├── duckduckgo_server.py     # stub (canonical server is at root)
+        ├── services/
+        │   ├── __init__.py
+        │   ├── search_engine.py     # RealSearchEngine — DuckDuckGo Lite
+        │   └── web_scraper.py       # DuckDuckGoScraper with retry & cache
+        └── tools/
+            ├── __init__.py
+            ├── toolhandler.py       # Abstract base class
+            └── search_tools.py     # get_internet_result tool handler
 ```
 
 ---
 
-## Installation
+## Available Tool (1)
+
+### `get_internet_result`
+
+Performs a real-time search on DuckDuckGo Lite and returns a concise answer with source links.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `input_value` | string | ✅ | Natural language query or search term |
+
+**Example output:**
+```
+Answer: Machine learning is a branch of artificial intelligence that enables systems to learn
+        and improve from experience without being explicitly programmed.
+Source 1: https://www.ibm.com/topics/machine-learning
+Source 2: https://www.google.com/search?q=what+is+machine+learning
+```
+
+---
+
+## Local Setup
 
 ```bash
-cd duckduckgo-browser-mcp
+# Create and activate virtual environment
 python -m venv .venv
+
 # Windows
 .venv\Scripts\activate
-# macOS/Linux
+# macOS / Linux
 source .venv/bin/activate
 
+# Install dependencies
 pip install -e .
 ```
 
 **Dependencies:**
-- mcp[cli]>=1.12.0
-- starlette>=0.27.0
-- uvicorn>=0.20.0
-- requests>=2.31.0 (HTTP client)
-- beautifulsoup4>=4.12.0 (HTML parsing)
+- `mcp[cli] >= 1.12.0`
+- `starlette >= 0.27.0`
+- `uvicorn >= 0.20.0`
+- `requests >= 2.31.0`
+- `beautifulsoup4 >= 4.12.0`
+- `truststore >= 0.10.0`
 
 ---
 
-## Running the Server
+## Run
 
-### 1. STDIO mode
-Used by MCP hosts like Claude Desktop, IDE plugins, and CLI clients.
-```bash
-python -m duckduckgo_browser --mode stdio
-```
-The server reads JSON-RPC frames from **stdin** and writes responses to **stdout**.
+The server is controlled by environment variables or CLI flags. Environment variables take priority and are used for container deployments.
 
-### 2. SSE mode (Server-Sent Events)
-```bash
-python -m duckduckgo_browser --mode sse --host 0.0.0.0 --port 7070
-```
-- `GET  http://localhost:7070/sse`       — open SSE stream
-- `POST http://localhost:7070/messages/` — send MCP request frames
+| Environment Variable | Default | Description |
+|---|---|---|
+| `TRANSPORT_TYPE` | `streamable-http` | Transport mode: `stdio`, `sse`, `streamable-http` |
+| `APP_HOST` | `0.0.0.0` | Bind host |
+| `APP_PORT` | `8000` | Bind port |
 
-### 3. Streamable HTTP mode (Recommended for Production)
+### stdio (default for MCP desktop hosts)
+
 ```bash
-python -m duckduckgo_browser --mode streamable-http --host 0.0.0.0 --port 7070
+duckduckgo-mcp --mode stdio
 ```
-- `POST http://localhost:7070/mcp` — single endpoint, chunked streaming response
+
+### SSE
+
+```bash
+duckduckgo-mcp --mode sse --host 0.0.0.0 --port 8000
+```
+
+Endpoints:
+- `GET  /sse`        — open SSE stream
+- `POST /messages/`  — send MCP request frames
+- `GET  /health`     — health check
+- `GET  /healthz`    — health check (alias)
+- `GET  /`           — server info
+
+### Streamable HTTP
+
+```bash
+duckduckgo-mcp --mode streamable-http --host 0.0.0.0 --port 8000
+```
+
+Endpoints:
+- `POST /mcp`     — single MCP endpoint, chunked streaming response
+- `GET  /health`  — health check
+- `GET  /healthz` — health check (alias)
+- `GET  /`        — server info
 
 ---
 
@@ -97,135 +130,150 @@ python -m duckduckgo_browser --mode streamable-http --host 0.0.0.0 --port 7070
 
 ```bash
 # Build
-docker build -t duckduckgo-browser-mcp .
+docker build -t duckduckgo-mcp .
 
-# Run (streamable-http, default)
-docker run -p 7070:7070 duckduckgo-browser-mcp
+# Run streamable-http (default)
+docker run -p 8000:8000 duckduckgo-mcp
 
 # Run SSE mode
-docker run -p 7070:7070 duckduckgo-browser-mcp --mode sse --port 7070
+docker run -e TRANSPORT_TYPE=sse -e APP_PORT=8000 -p 8000:8000 duckduckgo-mcp
 
-# Run STDIO mode (pipe-based)
-docker run -i duckduckgo-browser-mcp --mode stdio
+# Run with custom port
+docker run -e TRANSPORT_TYPE=streamable-http -e APP_PORT=9000 -p 9000:9000 duckduckgo-mcp
+
+# Run stdio mode (pipe-based)
+docker run -i -e TRANSPORT_TYPE=stdio duckduckgo-mcp
 ```
 
 ---
 
-## Tool: `get_internet_result`
+## MCP Client Configuration
 
-Performs real-time searches on DuckDuckGo Lite with automatic retry and caching.
+### Streamable HTTP
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `input_value` | string | ✅ | Natural language query or search term |
-
-### Example output
+```json
+{
+  "mcpServers": {
+    "duckduckgo": {
+      "type": "streamable-http",
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
 ```
-# DuckDuckGo Browser -- Search Results
-- **Query:** "what is machine learning"
-- **Topic category detected:** ai
-- **Results found:** 5
 
-## Top Results
-### 1. Machine Learning Explained
-- **URL:** https://www.ibm.com/topics/machine-learning
-- **Summary:** Machine learning is a subset of AI ...
-- **Relevance score:** 5
+### SSE
 
-## Suggested Websites to Explore
-### Hugging Face
-- **URL:** https://huggingface.co
-- **Why visit:** Leading hub for open-source AI models and datasets
+```json
+{
+  "mcpServers": {
+    "duckduckgo": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse"
+    }
+  }
+}
+```
 
-## What to Look For
-When researching AI topics, prioritise peer-reviewed papers (arXiv, NeurIPS) 
-and official model documentation. Cross-check benchmark claims on Papers With Code.
+### stdio
+
+```json
+{
+  "mcpServers": {
+    "duckduckgo": {
+      "command": "duckduckgo-mcp",
+      "args": ["--mode", "stdio"]
+    }
+  }
+}
+```
 
 ---
-*Results powered by DuckDuckGo Lite (https://lite.duckduckgo.com/lite/).*
-*Search performed in real-time with automatic retry and caching for reliability.*
-```
+
+## Testing with MCP Inspector
+
+**Streamable HTTP:**
+1. Start the server: `duckduckgo-mcp --mode streamable-http --port 8000`
+2. Open MCP Inspector and connect to: `http://localhost:8000/mcp`
+3. Call `get_internet_result` with `{"input_value": "what is machine learning"}`
+
+**SSE:**
+1. Start the server: `duckduckgo-mcp --mode sse --port 8000`
+2. Open MCP Inspector and connect to: `http://localhost:8000/sse`
+3. Call `get_internet_result` with `{"input_value": "best cloud providers 2026"}`
 
 ---
 
-## Example MCP Client Calls
+## How It Works
 
-### Python (stdio)
-```python
-import asyncio
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+### Search Flow
 
-async def main():
-    params = StdioServerParameters(
-        command="python",
-        args=["-m", "duckduckgo_browser", "--mode", "stdio"],
-    )
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "get_internet_result",
-                {"input_value": "what is machine learning"},
-            )
-            print(result.content[0].text)
-
-asyncio.run(main())
+```
+User Query
+    ↓
+get_internet_result (async tool handler)
+    ↓
+RealSearchEngine.search()
+    ↓
+DuckDuckGoScraper.search_with_retry()
+    ├─ Check in-memory cache (5-min TTL)
+    ├─ Cache hit  → return cached results
+    └─ Cache miss → fetch from DuckDuckGo Lite
+        ├─ Attempt 1 (10s timeout)
+        ├─ Fail → wait 2s → Attempt 2
+        ├─ Fail → wait 4s → Attempt 3
+        └─ All fail → return stale cache or empty result
+    ↓
+Auto-detect category from result content
+    ↓
+Format: Answer + Source 1 + Source 2
 ```
 
-### Python (SSE)
-```python
-import asyncio
-from mcp import ClientSession
-from mcp.client.sse import sse_client
+### Key Features
 
-async def main():
-    async with sse_client("http://localhost:7070/sse") as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "get_internet_result",
-                {"input_value": "best travel destinations Europe"},
-            )
-            print(result.content[0].text)
+| Feature | Details |
+|---|---|
+| **Search Source** | DuckDuckGo Lite (`https://lite.duckduckgo.com/lite/`) with HTML + Instant Answer API fallback |
+| **Retry Logic** | 3 attempts with exponential backoff (2s, 4s) |
+| **Request Timeout** | 10 seconds per attempt |
+| **Caching** | In-memory, 5-min TTL, stale fallback on network failure |
+| **SSL** | OS trust store via `truststore`; falls back to SSL-disabled as last resort |
+| **CORS** | Fully open (`allow_origins=["*"]`) for all HTTP modes |
+| **Session Timeout** | 60s per request (streamable-http), unlimited (stdio) |
 
-asyncio.run(main())
+### Category Detection
+
+Results are automatically categorised from URL, title, and snippet content:
+
+`ai` · `programming` · `cloud` · `finance` · `health` · `science` · `education` · `travel` · `food` · `sports` · `general`
+
+---
+
+## Kubernetes Deployment
+
+For EC2/Kubernetes, set transport mode and port via environment variables — no image rebuild needed:
+
+```yaml
+# Streamable HTTP deployment
+env:
+  - name: TRANSPORT_TYPE
+    value: "streamable-http"
+  - name: APP_PORT
+    value: "8000"
+  - name: APP_HOST
+    value: "0.0.0.0"
+
+# SSE deployment
+env:
+  - name: TRANSPORT_TYPE
+    value: "sse"
+  - name: APP_PORT
+    value: "8000"
+  - name: APP_HOST
+    value: "0.0.0.0"
 ```
 
-### Python (Streamable HTTP)
-```python
-import asyncio
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-
-async def main():
-    async with streamablehttp_client("http://localhost:7070/mcp") as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "get_internet_result",
-                {"input_value": "how does quantum computing work"},
-            )
-            print(result.content[0].text)
-
-asyncio.run(main())
-```
-
-### curl (Streamable HTTP — initialize)
-```bash
-curl -X POST http://localhost:7070/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-client","version":"1.0"}}}'
-```
-
-### curl (Streamable HTTP — call tool)
-```bash
-# Replace <SESSION_ID> with the mcp-session-id from the initialize response header
-curl -X POST http://localhost:7070/mcp \
-  -H "Content-Type: application/json" \
-  -H "mcp-session-id: <SESSION_ID>" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_internet_result","arguments":{"input_value":"python web frameworks"}}}'
-```
+> No supergateway wrapper is needed. The server handles its own HTTP binding directly for both SSE and streamable-http modes.
 
 ---
 
@@ -238,169 +286,67 @@ pytest
 
 ---
 
-## How It Works
+## Troubleshooting
 
-### Search Flow
-
-```
-User Query
-    ↓
-get_internet_result tool (async)
-    ↓
-RealSearchEngine.search()
-    ↓
-DuckDuckGoScraper.search_with_retry()
-    ├─ Check in-memory cache
-    ├─ If cached & valid → return cached results
-    ├─ If cache miss → fetch from DuckDuckGo Lite
-    │   ├─ Attempt 1: Request + parse (10s timeout)
-    │   ├─ Timeout? → wait 2s, retry
-    │   ├─ Attempt 2: Request + parse
-    │   ├─ Timeout? → wait 4s, retry
-    │   ├─ Attempt 3: Request + parse
-    │   ├─ All fail? → return stale cache or empty
-    └─ Cache new results (5 min TTL)
-    ↓
-Auto-detect Category
-    ↓
-Curated Website Suggestions
-    ↓
-Formatted Markdown Response
+**Port already in use**
+```bash
+duckduckgo-mcp --mode streamable-http --port 8001
 ```
 
-### Key Features
+**No search results returned**
+- Verify internet connectivity from the host/container
+- Test: `curl "https://lite.duckduckgo.com/lite/?q=test"`
+- Enable debug logging:
+  ```bash
+  PYTHONPATH=src python -c "import logging; logging.basicConfig(level=logging.DEBUG)"
+  ```
 
-**Retry Logic**
-- Maximum 3 attempts per query
-- Exponential backoff: 2s, 4s between retries
-- Timeout per request: 10 seconds
+**SSL errors in corporate network**
+- The scraper automatically retries with SSL verification disabled as a last resort
+- Alternatively, set `verify_ssl=False` in `web_scraper.py` `DuckDuckGoScraper` init
 
-**Caching**
-- In-memory cache with 5-minute TTL
-- Prevents repeated web calls for same query
-- Stale cache returned on network failures
-- Automatic eviction of expired entries
-
-**Error Handling**
-- Timeout errors trigger retry logic
-- Connection errors check cache
-- Network failures return cached data or graceful error message
-- STDIO: Catches BrokenPipeError on client disconnect
-- SSE: Per-session timeout (1 hour)
-- Streamable HTTP: Per-request timeout (60 seconds)
-
-**Category Detection**
-Results are automatically categorized based on content patterns:
-- AI, programming, cloud, finance, health, science, education, travel, food, sports, general
-
-Each category includes curated website suggestions.
+**Import errors after install**
+```bash
+pip install -e . --force-reinstall
+```
 
 ---
 
-## Configuration
+## Configuration Reference
 
-Adjust scraper behavior in `src/duckduckgo_browser/services/web_scraper.py`:
+Tune scraper behaviour in `src/duckduckgo_browser/services/web_scraper.py`:
 
 ```python
 DuckDuckGoScraper(
-    timeout=10.0,              # Request timeout (seconds)
-    max_retries=3,             # Retry attempts
-    retry_backoff_base=2.0,    # Exponential backoff base
-    cache_ttl=300,             # Cache TTL (seconds)
+    timeout=10.0,           # Request timeout per attempt (seconds)
+    max_retries=3,          # Number of retry attempts
+    retry_backoff_base=2.0, # Exponential backoff base (2s, 4s, ...)
+    cache_ttl=300,          # Cache TTL in seconds (5 minutes)
 )
-```
-
-Adjust HTTP server timeouts in `src/duckduckgo_browser/server.py`:
-- STDIO: Standard input timeout
-- SSE: 3600s session timeout
-- Streamable HTTP: 60s request timeout
-
----
-
-## Logging
-
-Server provides detailed logging at multiple levels:
-
-**Startup Output**
-```
-2026-04-01T15:36:13 INFO  duckduckgo-browser ================================================================================
-2026-04-01T15:36:13 INFO  duckduckgo-browser Starting DuckDuckGo Browser MCP Server
-2026-04-01T15:36:13 INFO  duckduckgo-browser Python: 3.11.6
-2026-04-01T15:36:13 INFO  duckduckgo-browser Mode: streamable-http
-2026-04-01T15:36:13 INFO  duckduckgo-browser Listening at http://0.0.0.0:7070
-2026-04-01T15:36:13 INFO  duckduckgo-browser Registered tools: ['get_internet_result']
-```
-
-**Log Levels**
-- **DEBUG**: Cache hits/misses, individual retry attempts, parser details
-- **INFO**: Tool registration, server startup, search requests
-- **WARNING**: Retry attempts, network failures, cache misses
-- **ERROR**: Fatal errors, unrecoverable failures
-
-Enable debug logging:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
 ```
 
 ---
 
 ## Robustness Summary
 
-| Feature | Details |
-|---------|---------|
-| **Network Retry** | 3x with exponential backoff (2s, 4s) |
-| **Request Timeout** | 10 seconds per attempt |
-| **Session Timeout** | 60s HTTP, 1h SSE, unlimited STDIO |
-| **Caching** | 5-min TTL + stale fallback |
-| **Error Recovery** | Graceful degradation, no crashes |
-| **STDIO Mode** | Handles BrokenPipeError, client disconnect |
-| **SSE Mode** | Connection error handling, CORS support |
-| **Streamable HTTP** | Error responses (504 timeout, 500 error) |
-| **Logging** | DEBUG/INFO/WARNING/ERROR levels |
+| Scenario | Behaviour |
+|---|---|
+| Network timeout | Retry up to 3x with exponential backoff |
+| All retries fail | Return stale cache if available, else empty result |
+| DuckDuckGo Lite unavailable | Fall back to HTML endpoint, then Instant Answer API |
+| SSL certificate error | Retry with SSL verification disabled |
+| Invalid query | Validation error returned as TextContent |
+| Port conflict | Clear error log with suggested fix |
+| Container restart | Cache cleared (in-memory); fresh searches on next request |
 
 ---
 
-## Known Limitations
+## Requirements
 
-1. **DuckDuckGo Lite Parse**: Assumes standard DuckDuckGo Lite HTML format
-   - May need updates if DDG changes HTML structure
-   - Parser handles missing/malformed results gracefully
+- Python 3.10+
+- Internet access (for DuckDuckGo searches)
+- No API key required
 
-2. **Network Dependency**: Requires internet connectivity
-   - Uses cache to survive brief outages
-   - Falls back to empty results after 3 retries
+## License
 
-3. **Rate Limiting**: DuckDuckGo may rate-limit rapid requests
-   - Exponential backoff helps mitigate
-   - Cache reduces repeated queries
-
-4. **In-Memory Cache**: Lost on server restart
-   - Suitable for most deployments
-   - Consider persistent cache (Redis/SQLite) for high-volume use
-
----
-
-## Troubleshooting
-
-**Port Already in Use**
-```bash
-python -m duckduckgo_browser --mode streamable-http --port 8000
-```
-
-**Connection Timeout**
-- Verify internet connectivity
-- Test: `curl https://lite.duckduckgo.com/lite/?q=test`
-- Check firewall rules
-
-**No Results**
-- Verify query is valid
-- Check logs: Enable DEBUG level logging
-- Test with simpler query terms
-
-**Dependency Issues**
-```bash
-pip install -r requirements.txt
-# or
-pip install -e .
-```
+MIT License — see LICENSE file for details
